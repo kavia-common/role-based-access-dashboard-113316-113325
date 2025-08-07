@@ -1,9 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import logo from './logo.svg';
 import './App.css';
+import { AuthProvider } from './contexts/AuthContext';
+import useAuth from './hooks/useAuth';
 
-// PUBLIC_INTERFACE
-function App() {
+// Component to display auth status - will be expanded in future iterations
+const AuthStatus = () => {
+  const { user, loading, isAuthenticated, getUserRole } = useAuth();
+  
+  if (loading) return <p>Loading authentication...</p>;
+  
+  return (
+    <div style={{ margin: '20px 0', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+      <h3>Authentication Status</h3>
+      {isAuthenticated() ? (
+        <div>
+          <p>✅ Authenticated as: {user?.email}</p>
+          <p>Role: {getUserRole() || 'No role assigned'}</p>
+          <p>User ID: {user?.id}</p>
+        </div>
+      ) : (
+        <p>❌ Not authenticated</p>
+      )}
+    </div>
+  );
+};
+
+// Main App component wrapped with authentication
+const AppContent = () => {
   const [theme, setTheme] = useState('light');
 
   // Effect to apply theme to document element
@@ -28,11 +52,12 @@ function App() {
         </button>
         <img src={logo} className="App-logo" alt="logo" />
         <p>
-          Edit <code>src/App.js</code> and save to reload.
+          RBAC Team Dashboard
         </p>
         <p>
           Current theme: <strong>{theme}</strong>
         </p>
+        <AuthStatus />
         <a
           className="App-link"
           href="https://reactjs.org"
@@ -43,6 +68,15 @@ function App() {
         </a>
       </header>
     </div>
+  );
+};
+
+// PUBLIC_INTERFACE
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
