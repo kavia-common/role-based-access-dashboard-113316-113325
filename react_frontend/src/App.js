@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-ro
 import './App.css';
 import { AuthProvider } from './contexts/AuthContext';
 import useAuth from './hooks/useAuth';
-import { ProtectedRoute } from './components';
+import { ProtectedRoute, Header, Sidebar } from './components';
 
 // Simple Login Page Component
 const LoginPage = () => {
@@ -99,37 +99,19 @@ const LoginPage = () => {
 
 // Dashboard Component for authenticated users
 const Dashboard = () => {
-  const { user, getUserRole, signOut } = useAuth();
-  
-  const handleSignOut = async () => {
-    await signOut();
-  };
+  const { user, getUserRole } = useAuth();
 
   return (
-    <div style={{ padding: '20px', textAlign: 'center' }}>
+    <div style={{ textAlign: 'center' }}>
       <h2>Dashboard</h2>
       <div style={{ margin: '20px 0', padding: '20px', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
         <h3>Welcome, {user?.email}!</h3>
         <p>Your role: <strong>{getUserRole() || 'No role assigned'}</strong></p>
         <p>User ID: {user?.id}</p>
-        <button 
-          onClick={handleSignOut}
-          style={{ 
-            padding: '10px 20px', 
-            backgroundColor: '#dc3545', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer',
-            marginTop: '10px'
-          }}
-        >
-          Sign Out
-        </button>
       </div>
       
       <div style={{ marginTop: '20px' }}>
-        <h4>Available Routes:</h4>
+        <h4>Quick Actions:</h4>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <Link to="/user" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>
             User Page
@@ -151,7 +133,7 @@ const AdminPage = () => {
   const { user, getUserRole } = useAuth();
   
   return (
-    <div style={{ padding: '20px', textAlign: 'center' }}>
+    <div style={{ textAlign: 'center' }}>
       <h2>🔐 Admin Panel</h2>
       <p>This page is only accessible to admin users.</p>
       <div style={{ margin: '20px 0', padding: '20px', border: '2px solid #28a745', borderRadius: '8px' }}>
@@ -170,7 +152,7 @@ const UserPage = () => {
   const { user, getUserRole } = useAuth();
   
   return (
-    <div style={{ padding: '20px', textAlign: 'center' }}>
+    <div style={{ textAlign: 'center' }}>
       <h2>👤 User Area</h2>
       <p>This page is accessible to users and admins.</p>
       <div style={{ margin: '20px 0', padding: '20px', border: '2px solid #007bff', borderRadius: '8px' }}>
@@ -189,7 +171,7 @@ const GuestPage = () => {
   const { user, getUserRole } = useAuth();
   
   return (
-    <div style={{ padding: '20px', textAlign: 'center' }}>
+    <div style={{ textAlign: 'center' }}>
       <h2>👋 Guest Area</h2>
       <p>This page is accessible to all authenticated users.</p>
       <div style={{ margin: '20px 0', padding: '20px', border: '2px solid #6c757d', borderRadius: '8px' }}>
@@ -203,39 +185,10 @@ const GuestPage = () => {
   );
 };
 
-// Navigation component
-const Navigation = () => {
-  const { isAuthenticated } = useAuth();
-  
-  if (!isAuthenticated()) return null;
-  
-  return (
-    <nav style={{ 
-      padding: '10px 20px', 
-      backgroundColor: 'var(--bg-secondary)', 
-      borderBottom: '1px solid var(--border-color)' 
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
-        <Link to="/dashboard" style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>
-          Dashboard
-        </Link>
-        <Link to="/user" style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>
-          User
-        </Link>
-        <Link to="/admin" style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>
-          Admin
-        </Link>
-        <Link to="/guest" style={{ color: 'var(--text-primary)', textDecoration: 'none' }}>
-          Guest
-        </Link>
-      </div>
-    </nav>
-  );
-};
-
 // Main App component with routing
 const AppContent = () => {
   const [theme, setTheme] = useState('light');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { isAuthenticated, loading } = useAuth();
 
   // Effect to apply theme to document element
@@ -248,6 +201,10 @@ const AppContent = () => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed(prev => !prev);
+  };
+
   if (loading) {
     return (
       <div className="App">
@@ -258,19 +215,31 @@ const AppContent = () => {
     );
   }
 
+  const mainContentMargin = isAuthenticated() ? (sidebarCollapsed ? '60px' : '240px') : '0';
+
   return (
     <div className="App">
-      <button 
-        className="theme-toggle" 
-        onClick={toggleTheme}
-        aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-      >
-        {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
-      </button>
+      {/* Header */}
+      <Header 
+        onToggleTheme={toggleTheme}
+        currentTheme={theme}
+      />
       
-      <Navigation />
+      {/* Sidebar */}
+      <Sidebar 
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
+      />
       
-      <main style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', minHeight: '100vh' }}>
+      {/* Main Content */}
+      <main style={{ 
+        backgroundColor: 'var(--bg-primary)', 
+        color: 'var(--text-primary)', 
+        minHeight: 'calc(100vh - 60px)',
+        marginLeft: mainContentMargin,
+        transition: 'margin-left 0.3s ease',
+        padding: isAuthenticated() ? '20px' : '0'
+      }}>
         <Routes>
           {/* Public route for login */}
           <Route 
@@ -342,6 +311,15 @@ const AppContent = () => {
           />
         </Routes>
       </main>
+      
+      {/* Responsive CSS */}
+      <style>{`
+        @media (max-width: 768px) {
+          main {
+            margin-left: 0 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };
