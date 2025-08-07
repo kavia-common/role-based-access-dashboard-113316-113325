@@ -5,6 +5,8 @@
  */
 
 export { default as ProtectedRoute } from './ProtectedRoute';
+export { default as LoginModal } from './Auth/LoginModal';
+export { default as RegisterModal } from './Auth/RegisterModal';
 
 // Future components can be exported here as well
 // export { default as Header } from './Header';
