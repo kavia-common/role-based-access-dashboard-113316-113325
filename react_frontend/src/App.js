@@ -1,188 +1,173 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import './App.css';
 import { AuthProvider } from './contexts/AuthContext';
 import useAuth from './hooks/useAuth';
-import { ProtectedRoute, Header, Sidebar } from './components';
+import { 
+  ProtectedRoute, 
+  Header, 
+  Sidebar, 
+  LoginModal, 
+  RegisterModal, 
+  ProfileDisplay 
+} from './components';
+import AdminDashboard from './components/Dashboard/AdminDashboard';
+import UserDashboard from './components/Dashboard/UserDashboard';
+import GuestDashboard from './components/Dashboard/GuestDashboard';
 
-// Simple Login Page Component
+// Login Page Component with modal support
 const LoginPage = () => {
-  const { signIn, signUp, loading } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [message, setMessage] = useState('');
+  const { isAuthenticated } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(true);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage('');
+  // Redirect if already authenticated
+  if (isAuthenticated()) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
-    if (isSignUp) {
-      const { error } = await signUp(email, password);
-      if (error) {
-        setMessage(`Sign up failed: ${error.message}`);
-      } else {
-        setMessage('Sign up successful! Please check your email for verification.');
-      }
-    } else {
-      const { error } = await signIn(email, password);
-      if (error) {
-        setMessage(`Sign in failed: ${error.message}`);
-      }
-    }
+  const handleSwitchToRegister = () => {
+    setShowLoginModal(false);
+    setShowRegisterModal(true);
+  };
+
+  const handleSwitchToLogin = () => {
+    setShowRegisterModal(false);
+    setShowLoginModal(true);
+  };
+
+  const handleLoginSuccess = () => {
+    setShowLoginModal(false);
+  };
+
+  const handleRegisterSuccess = () => {
+    setShowRegisterModal(false);
+    setShowLoginModal(true);
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: '50px auto', padding: '20px', textAlign: 'center' }}>
-      <h2>{isSignUp ? 'Sign Up' : 'Sign In'}</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border-color)' }}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          style={{ padding: '10px', borderRadius: '4px', border: '1px solid var(--border-color)' }}
-        />
-        <button 
-          type="submit" 
-          disabled={loading}
-          style={{ 
-            padding: '10px', 
-            backgroundColor: 'var(--button-bg)', 
-            color: 'var(--button-text)', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
-        </button>
-      </form>
-      
-      <button
-        onClick={() => setIsSignUp(!isSignUp)}
-        style={{ 
-          marginTop: '10px', 
-          background: 'none', 
-          border: 'none', 
-          color: 'var(--text-secondary)', 
-          cursor: 'pointer', 
-          textDecoration: 'underline' 
-        }}
-      >
-        {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-      </button>
-      
-      {message && (
-        <p style={{ 
-          marginTop: '15px', 
-          padding: '10px', 
-          backgroundColor: message.includes('failed') ? '#fee' : '#efe',
-          color: message.includes('failed') ? '#c33' : '#363',
-          borderRadius: '4px'
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'var(--bg-secondary)',
+      padding: '20px'
+    }}>
+      <div style={{
+        maxWidth: '500px',
+        width: '100%',
+        textAlign: 'center',
+        backgroundColor: 'var(--bg-primary)',
+        borderRadius: '12px',
+        padding: '40px',
+        border: '1px solid var(--border-color)',
+        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+      }}>
+        <div style={{
+          width: '64px',
+          height: '64px',
+          backgroundColor: 'var(--primary-color)',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 24px auto',
+          fontSize: '28px',
+          color: 'white',
+          fontWeight: 'bold'
         }}>
-          {message}
+          R
+        </div>
+        
+        <h1 style={{
+          margin: '0 0 8px 0',
+          fontSize: '28px',
+          fontWeight: '700',
+          color: 'var(--text-primary)'
+        }}>
+          RBAC Dashboard
+        </h1>
+        
+        <p style={{
+          margin: '0 0 32px 0',
+          color: 'var(--text-secondary)',
+          fontSize: '16px'
+        }}>
+          Role-Based Access Control Team Dashboard
         </p>
-      )}
-    </div>
-  );
-};
 
-// Dashboard Component for authenticated users
-const Dashboard = () => {
-  const { user, getUserRole } = useAuth();
-
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <h2>Dashboard</h2>
-      <div style={{ margin: '20px 0', padding: '20px', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-        <h3>Welcome, {user?.email}!</h3>
-        <p>Your role: <strong>{getUserRole() || 'No role assigned'}</strong></p>
-        <p>User ID: {user?.id}</p>
-      </div>
-      
-      <div style={{ marginTop: '20px' }}>
-        <h4>Quick Actions:</h4>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <Link to="/user" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>
-            User Page
-          </Link>
-          <Link to="/admin" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>
-            Admin Page
-          </Link>
-          <Link to="/guest" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>
-            Guest Page
-          </Link>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <button
+            onClick={() => setShowLoginModal(true)}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: 'var(--primary-color)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Sign In
+          </button>
+          
+          <button
+            onClick={() => setShowRegisterModal(true)}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: 'transparent',
+              color: 'var(--primary-color)',
+              border: '2px solid var(--primary-color)',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Sign Up
+          </button>
         </div>
       </div>
+
+      {/* Authentication Modals */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSwitchToRegister={handleSwitchToRegister}
+        onSuccess={handleLoginSuccess}
+      />
+      
+      <RegisterModal
+        isOpen={showRegisterModal}
+        onClose={() => setShowRegisterModal(false)}
+        onSwitchToLogin={handleSwitchToLogin}
+        onSuccess={handleRegisterSuccess}
+      />
     </div>
   );
 };
 
-// Admin-only component
-const AdminPage = () => {
-  const { user, getUserRole } = useAuth();
-  
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <h2>🔐 Admin Panel</h2>
-      <p>This page is only accessible to admin users.</p>
-      <div style={{ margin: '20px 0', padding: '20px', border: '2px solid #28a745', borderRadius: '8px' }}>
-        <p>✅ Access granted for: {user?.email}</p>
-        <p>Role: <strong>{getUserRole()}</strong></p>
-      </div>
-      <Link to="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>
-        ← Back to Dashboard
-      </Link>
-    </div>
-  );
-};
+// Dashboard routing component that renders appropriate dashboard based on role
+const Dashboard = () => {
+  const { getUserRole } = useAuth();
+  const userRole = getUserRole();
 
-// User-accessible component
-const UserPage = () => {
-  const { user, getUserRole } = useAuth();
-  
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <h2>👤 User Area</h2>
-      <p>This page is accessible to users and admins.</p>
-      <div style={{ margin: '20px 0', padding: '20px', border: '2px solid #007bff', borderRadius: '8px' }}>
-        <p>✅ Access granted for: {user?.email}</p>
-        <p>Role: <strong>{getUserRole()}</strong></p>
-      </div>
-      <Link to="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>
-        ← Back to Dashboard
-      </Link>
-    </div>
-  );
-};
-
-// Guest-accessible component
-const GuestPage = () => {
-  const { user, getUserRole } = useAuth();
-  
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <h2>👋 Guest Area</h2>
-      <p>This page is accessible to all authenticated users.</p>
-      <div style={{ margin: '20px 0', padding: '20px', border: '2px solid #6c757d', borderRadius: '8px' }}>
-        <p>✅ Access granted for: {user?.email}</p>
-        <p>Role: <strong>{getUserRole() || 'No role assigned'}</strong></p>
-      </div>
-      <Link to="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>
-        ← Back to Dashboard
-      </Link>
-    </div>
-  );
+  // Route to appropriate dashboard based on role
+  switch (userRole) {
+    case 'admin':
+      return <AdminDashboard />;
+    case 'user':
+      return <UserDashboard />;
+    case 'guest':
+      return <GuestDashboard />;
+    default:
+      return <GuestDashboard />;
+  }
 };
 
 // Main App component with routing
@@ -264,7 +249,7 @@ const AppContent = () => {
             path="/admin" 
             element={
               <ProtectedRoute requiredRole="admin">
-                <AdminPage />
+                <AdminDashboard />
               </ProtectedRoute>
             } 
           />
@@ -274,7 +259,7 @@ const AppContent = () => {
             path="/user" 
             element={
               <ProtectedRoute requiredRole={['user', 'admin']}>
-                <UserPage />
+                <UserDashboard />
               </ProtectedRoute>
             } 
           />
@@ -284,7 +269,17 @@ const AppContent = () => {
             path="/guest" 
             element={
               <ProtectedRoute>
-                <GuestPage />
+                <GuestDashboard />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Profile route - accessible to all authenticated users */}
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <ProfileDisplay />
               </ProtectedRoute>
             } 
           />
