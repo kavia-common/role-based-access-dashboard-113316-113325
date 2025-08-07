@@ -12,5 +12,8 @@ export { default as RegisterModal } from './Auth/RegisterModal';
 export { default as Header } from './Layout/Header';
 export { default as Sidebar } from './Layout/Sidebar';
 
+// Profile components
+export { default as ProfileDisplay } from './Profile/ProfileDisplay';
+
 // Future components can be exported here as well
 // export { default as Dashboard } from './Dashboard';
