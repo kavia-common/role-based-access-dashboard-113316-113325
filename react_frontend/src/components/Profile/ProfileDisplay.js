@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import useAuth from '../../hooks/useAuth';
-import { supabase } from '../../config/supabase';
+import supabase from '../../config/supabase';
 
 // PUBLIC_INTERFACE
 /**

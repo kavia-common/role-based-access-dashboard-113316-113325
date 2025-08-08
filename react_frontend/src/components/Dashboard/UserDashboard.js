@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
-import { supabase } from '../../config/supabase';
+import supabase from '../../config/supabase';
+import useTasks from '../../hooks/useTasks';
+import TaskInput from '../Tasks/TaskInput';
 
 // PUBLIC_INTERFACE
 /**
  * UserDashboard component providing standard user interface
- * Features profile information, activity overview, and user-specific tools
+ * Features profile information, activity overview, and user-specific tools,
+ * plus a task management section for viewing and adding tasks.
  * Accessible to users with 'user' or 'admin' roles
  * 
- * @returns {React.ReactNode} User dashboard with profile and activity features
+ * @returns {React.ReactNode} User dashboard with profile, activity, and task management features
  */
 const UserDashboard = () => {
   const { user, getUserRole } = useAuth();
@@ -17,11 +20,16 @@ const UserDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [lastLogin, setLastLogin] = useState(null);
   const [accountAge, setAccountAge] = useState('');
+  const [showTaskInput, setShowTaskInput] = useState(false);
+
+  // Tasks
+  const { tasks = [], loading: tasksLoading, error: tasksError, refetch } = useTasks(user?.id);
 
   // Fetch user profile and calculate statistics
   useEffect(() => {
     fetchUserProfile();
     calculateAccountStats();
+    // eslint-disable-next-line
   }, [user]);
 
   const fetchUserProfile = async () => {
@@ -102,6 +110,12 @@ const UserDashboard = () => {
       case 'guest': return 'Limited access to basic features';
       default: return 'No role assigned - contact administrator';
     }
+  };
+
+  // Task Adding
+  const handleTaskCreated = () => {
+    setShowTaskInput(false);
+    if (typeof refetch === "function") refetch();
   };
 
   return (
@@ -267,11 +281,11 @@ const UserDashboard = () => {
               fontWeight: '500',
               transition: 'all 0.3s ease'
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={e => {
               e.target.style.backgroundColor = '#545b62';
               e.target.style.transform = 'translateY(-1px)';
             }}
-            onMouseLeave={(e) => {
+            onMouseLeave={e => {
               e.target.style.backgroundColor = '#6c757d';
               e.target.style.transform = 'translateY(0)';
             }}
@@ -294,11 +308,11 @@ const UserDashboard = () => {
                 fontWeight: '500',
                 transition: 'all 0.3s ease'
               }}
-              onMouseEnter={(e) => {
+              onMouseEnter={e => {
                 e.target.style.backgroundColor = '#c82333';
                 e.target.style.transform = 'translateY(-1px)';
               }}
-              onMouseLeave={(e) => {
+              onMouseLeave={e => {
                 e.target.style.backgroundColor = '#dc3545';
                 e.target.style.transform = 'translateY(0)';
               }}
@@ -322,11 +336,11 @@ const UserDashboard = () => {
               cursor: 'pointer',
               transition: 'all 0.3s ease'
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={e => {
               e.target.style.backgroundColor = '#1e7e34';
               e.target.style.transform = 'translateY(-1px)';
             }}
-            onMouseLeave={(e) => {
+            onMouseLeave={e => {
               e.target.style.backgroundColor = '#28a745';
               e.target.style.transform = 'translateY(0)';
             }}
@@ -419,6 +433,79 @@ const UserDashboard = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* --- Tasks Section --- */}
+      <div style={{
+        backgroundColor: 'var(--bg-secondary)',
+        borderRadius: '12px',
+        border: '1px solid var(--border-color)',
+        marginTop: 32,
+        marginBottom: 24,
+        padding: 24
+      }}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <h3 style={{ margin: 0, fontWeight: 700 }}>My Tasks</h3>
+          <button
+            style={{
+              background: "#eb8e24",
+              color: "#fff",
+              border: "none",
+              borderRadius: 4,
+              padding: "8px 18px",
+              fontWeight: 500,
+              cursor: "pointer"
+            }}
+            onClick={() => setShowTaskInput(true)}
+          >
+            + Add New Task
+          </button>
+        </div>
+        {showTaskInput && (
+          <div
+            style={{
+              position: "fixed",
+              left: 0,
+              top: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0,0,0,0.13)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 30
+            }}
+          >
+            <TaskInput
+              useTasks={useTasks}
+              user={user}
+              onTaskCreated={handleTaskCreated}
+              onClose={() => setShowTaskInput(false)}
+            />
+          </div>
+        )}
+        {tasksLoading && <div>Loading tasks...</div>}
+        {tasksError && <div style={{ color: "red" }}>{tasksError.message}</div>}
+        <ul style={{marginTop:18, paddingLeft:0, listStyle:"none"}}>
+          {tasks.length === 0 && !tasksLoading && (
+            <li style={{ color: "#64748b" }}>No tasks yet. Add one!</li>
+          )}
+          {tasks.map((task) => (
+            <li key={task.id} style={{
+              border:"1px solid #eee",
+              padding:12,
+              marginBottom:8,
+              borderRadius:6,
+              background:"#fcfcfc",
+              boxShadow:"0 1px 3px rgba(0,0,0,0.02)"
+            }}>
+              <strong>{task.title}</strong>
+              <div style={{ fontSize: 14, color: "#555" }}>{task.description}</div>
+              <span style={{fontSize:13}}>Status: {task.progress}</span>
+              <div style={{fontSize:13, color:"#888"}}>Created: {task.date ? formatDate(task.date) : "-"}</div>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
