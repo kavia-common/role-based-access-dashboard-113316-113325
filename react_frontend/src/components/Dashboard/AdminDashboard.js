@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
-import { supabase } from '../../config/supabase';
+import supabase from '../../config/supabase';
 
 // PUBLIC_INTERFACE
 /**

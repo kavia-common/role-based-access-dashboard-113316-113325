@@ -69,6 +69,65 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 ```
 
+---
+
+## Tasks Table and CRUD Integration
+
+### Table: tasks
+
+| Field         | Type        | Description                                                  |
+|---------------|-------------|--------------------------------------------------------------|
+| id            | int, PK     | Primary key                                                  |
+| title         | text        | Title of the task                                            |
+| description   | text        | Description/details of the task                              |
+| progress      | integer     | Progress percent (e.g. 0-100) or status code                 |
+| user_id       | uuid/text   | References auth.users.id or custom profile id                |
+| date          | date        | The tracking date for the task ('YYYY-MM-DD')                |
+| inserted_at   | timestamp   | (auto) record creation timestamp                             |
+| updated_at    | timestamp   | (auto) last update timestamp                                 |
+
+- Table should be created manually in Supabase Table Editor or via SQL:
+
+```sql
+create table tasks (
+  id serial primary key,
+  title text not null,
+  description text,
+  progress integer default 0,
+  user_id uuid not null,
+  date date not null,
+  inserted_at timestamp with time zone default timezone('utc', now()),
+  updated_at timestamp with time zone default timezone('utc', now())
+);
+```
+
+Feel free to adjust field types (uuid/text for user_id and integer for progress/status).
+
+### Security: 
+- RBAC should be implemented using Supabase RLS (row-level-security).
+- Example recommended policies: users can select/modify/delete only their own tasks (`user_id = auth.uid()`); admins can do more.
+- Set up the correct RLS policies once table is created.
+
+### CRUD API (via Supabase JS SDK)
+- See `src/hooks/useTasks.js` for hook-based API used by the frontend.
+- Uses environment variables:
+  - `REACT_APP_SUPABASE_URL`
+  - `REACT_APP_SUPABASE_KEY`
+
+#### Actions available
+- `createTask({title, description, progress, user_id, date})`: add a task
+- `getTasks({user_id, date})`: list tasks (optionally filtered by user)
+- `updateTask(id, updates)`: update provided fields for a task by id
+- `deleteTask(id)`: remove task by id
+
+> See `src/hooks/useTasks.js` for details.
+
+### Dev/Deployment
+- Ensure .env has correct `REACT_APP_SUPABASE_URL` and `REACT_APP_SUPABASE_KEY`.
+- Table should be provisioned before these features will work.
+
+---
+
 ## Authentication Configuration
 
 ### Email Settings
@@ -105,3 +164,4 @@ To create the first admin user:
 - Role-based access control (admin, user, guest)
 - Session management
 - Profile management with roles
+- Daily task tracking for users (tasks CRUD)
