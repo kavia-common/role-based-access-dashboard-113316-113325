@@ -14,11 +14,19 @@ import useAuth from '../../hooks/useAuth';
  * @returns {React.ReactNode} Header component with navigation and user controls
  */
 const Header = ({ onToggleTheme, currentTheme = 'light' }) => {
-  const { user, getUserRole, signOut, isAuthenticated } = useAuth();
+  const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
 
+  // Helper for auth state, in upgraded AuthContext
+  const isAuthenticated = () => !!user;
+
+  // Helper for role (now provided by 'role' from context)
+  const getUserRole = () => role;
+
   const handleSignOut = async () => {
-    await signOut();
+    if (signOut) {
+      await signOut();
+    }
     navigate('/login');
   };
 

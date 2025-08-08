@@ -14,16 +14,16 @@ import useAuth from '../../hooks/useAuth';
  * @returns {React.ReactNode} Sidebar component with role-based navigation
  */
 const Sidebar = ({ isCollapsed = false, onToggleCollapse }) => {
-  const { getUserRole, isAuthenticated } = useAuth();
+  const { user, role } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Don't render sidebar if not authenticated
-  if (!isAuthenticated()) {
+  if (!user) {
     return null;
   }
 
-  const userRole = getUserRole();
+  const userRole = role;
 
   // Navigation items based on role
   const getNavItems = () => {
