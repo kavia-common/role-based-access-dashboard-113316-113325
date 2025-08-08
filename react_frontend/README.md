@@ -1,94 +1,128 @@
-# Lightweight React Template for KAVIA
+# React Frontend – RBAC Team Dashboard
 
-This project provides a minimal React template with a clean, modern UI and minimal dependencies.
+A clean, minimal React app demonstrating Supabase-powered authentication with centralized roles/permissions, role-based dashboards, and strict RBAC protection.
+
+---
 
 ## Features
 
-- **Lightweight**: No heavy UI frameworks - uses only vanilla CSS and React
-- **Modern UI**: Clean, responsive design with KAVIA brand styling
-- **Fast**: Minimal dependencies for quick loading times
-- **Simple**: Easy to understand and modify
+- **Authentication**: Supabase email/password signup & login, modal-based flow, session persistence, logout.
+- **RBAC (Role-Based Access Control):**  
+  Profiles, role assignments, and permissions matrix defined in [`src/config/permissions.js`](./src/config/permissions.js)
+- **Role-based UI:**  
+  Dashboard, navigation, and interaction adapt to user’s role (`superadmin`, `orgadmin`, `admin`, `user`, `guest`).
+- **Protected Routes:**  
+  Using `<ProtectedRoute/>` for per-page RBAC enforcement.
+- **Central AuthContext:**  
+  Provides `user`, `role`, and `can(permission)` for convenient hooks/components use.
+- **Organization-aware seeding:**  
+  Demo org and user data ready for easy onboarding and RLS verification.
+- **Modern, fully responsive UI:**  
+  No external UI libraries—just React and CSS—branding set in `src/App.css`.
 
-## RBAC & Permissions Matrix
-
-This app uses a centralized, config-driven role/permissions system:
-
-- The permissions matrix file is at `src/config/permissions.js`.
-- All feature/route/conditional rendering uses this shared matrix for flexibility, organization-wide consistency, and ease of updates.
-- Role and permission checks in the UI, hooks, and routes refer to this matrix via the `can()` method on the AuthContext.
-- To visualize the full permissions model, use the included `<PermissionsMatrix />` UI component (`src/components/UI/PermissionsMatrix.js`)—rendered in the Super Admin dashboard by default.
-
-**To add or modify roles and permissions:**  Edit only `src/config/permissions.js`. Your changes propagate app-wide.
+---
 
 ## Getting Started
 
-In the project directory, you can run:
+1. **Configure Environment Variables**
+   - Copy `.env.example` to `.env` (If not present, create a `.env` file):
+     ```
+     REACT_APP_SUPABASE_URL=https://<your-project>.supabase.co
+     REACT_APP_SUPABASE_KEY=<your-anon-key>
+     ```
+   - Both must be valid and correspond to your Supabase dashboard [Project Settings > API].
 
-### `npm start`
+2. **Install Dependencies**
+   ```
+   npm install
+   ```
 
-Runs the app in development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+3. **Start Dev Server**
+   ```
+   npm start
+   ```
+   - Runs on [http://localhost:3000](http://localhost:3000)
 
-### `npm test`
+---
 
-Launches the test runner in interactive watch mode.
+## RBAC & Permissions Matrix
 
-### `npm run build`
+- Permissions matrix declared in [`src/config/permissions.js`](./src/config/permissions.js):
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+| Role        | Permissions                                                                               |
+|-------------|------------------------------------------------------------------------------------------|
+| superadmin  | view_dashboard, manage_admins, manage_orgs, edit_profile, invite_user, view_users, ...    |
+| orgadmin    | view_dashboard, manage_orgs, edit_profile, invite_user, view_users, ...                   |
+| admin       | view_dashboard, edit_profile, invite_user, view_users                                     |
+| user        | view_dashboard, edit_profile                                                              |
+| guest       | view_dashboard (limited)                                                                  |
 
-## Customization
+- All feature and navigation logic refer to this config.
+- **UI Matrix:** Visualize the complete permissions model using the `<PermissionsMatrix />` component (found in the Super Admin dashboard).
 
-### Colors
+**To update RBAC/permissions:**  
+Update `src/config/permissions.js` only; changes propagate app-wide.
 
-The main brand colors are defined as CSS variables in `src/App.css`:
+---
 
-```css
-:root {
-  --kavia-orange: #E87A41;
-  --kavia-dark: #1A1A1A;
-  --text-color: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --border-color: rgba(255, 255, 255, 0.1);
-}
+## Onboarding, Demo Users, & Seeding
+
+- The app is demo-ready. See [`../assets/supabase-demo-seed-guide.md`](../assets/supabase-demo-seed-guide.md) for:
+  - Registering demo users (UI or via Supabase dashboard)
+  - Assigning orgs, roles, and running the SQL seed script for auto test/verification.
+  - Explains expected dashboard results for each user role.
+  - RLS walkthrough for real backend security verification.
+
+---
+
+## Environment Variables
+
+The frontend consumes only these variables at build/runtime:
+
+```
+REACT_APP_SUPABASE_URL
+REACT_APP_SUPABASE_KEY
 ```
 
-### Components
+Add these to `.env` (do NOT commit real values to the repo).
 
-This template uses pure HTML/CSS components instead of a UI framework. You can find component styles in `src/App.css`. 
+---
 
-Common components include:
-- Buttons (`.btn`, `.btn-large`)
-- Container (`.container`)
-- Navigation (`.navbar`)
-- Typography (`.title`, `.subtitle`, `.description`)
+## Deployment
 
-## Learn More
+1. Build for production:
+   ```
+   npm run build
+   ```
+   Outputs to the `build/` directory for static hosting.
+2. Deploy using Vercel, Netlify, Firebase, or your own server.
+3. Set environment variables (`REACT_APP_SUPABASE_URL`, `REACT_APP_SUPABASE_KEY`) in your host’s settings/console.
+4. Confirm that your Supabase DB is seeded and RLS is enabled before going live.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+---
 
-### Code Splitting
+## Troubleshooting
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+- **Auth errors:**  
+  - Double-check `.env` values.
+  - Ensure your Supabase project allows email/password logins.
+  - Check RLS policies if users can't access their dashboards.
+- **Frontend issues:**  
+  - Make sure all dependencies are installed (`npm ci`).
+  - Clear browser cache or open private window for auth flow debugging.
+- **RLS/Backend problems:**  
+  - Use Supabase SQL Editor to validate data, log in as demo user roles for cross-checking.
 
-### Analyzing the Bundle Size
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## Frontend Customization
 
-### Making a Progressive Web App
+- **Brand Colors & Theme:**  
+  Defined as CSS custom properties in [`src/App.css`](./src/App.css) for consistency.
+- **Component Layering & Structure:**  
+  See [Components Folder](./src/components/README.md) and code-level docstrings.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+---
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+For full system, RBAC, schema, and demo data details, see the parent [`README.md`](../README.md) and Supabase guides under `assets/`.
 
