@@ -4,23 +4,17 @@ import { useAuth } from "../contexts/AuthContext";
 
 /**
  * PUBLIC_INTERFACE
- * ProtectedRoute supports RBAC by requiredRoles and/or permissions.
- * @param {Array|string} requiredRoles
- * @param {string} requiredPermission
+ * ProtectedRoute supports RBAC by requiredPermission (config-powered).
+ * @param {React.ReactNode} children - The protected content
+ * @param {string|string[]} requiredPermission - Permissions needed 
  */
-export default function ProtectedRoute({ children, requiredRoles, requiredPermission }) {
-  const { user, roles, loading, hasPermission } = useAuth();
+export default function ProtectedRoute({ children, requiredPermission }) {
+  const { user, role, can, loading } = useAuth();
 
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/" />;
-
-  if (requiredRoles) {
-    const roleSet = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
-    const found = roleSet.some(r => roles.includes(r));
-    if (!found) return <div>You do not have access to this page.</div>;
-  }
-  if (requiredPermission && !hasPermission(requiredPermission))
-    return <div>You do not have this permission.</div>;
+  if (requiredPermission && !can(requiredPermission))
+    return <div>You do not have access to this feature.</div>;
 
   return children;
 }

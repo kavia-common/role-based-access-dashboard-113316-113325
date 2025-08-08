@@ -9,6 +9,17 @@ This project provides a minimal React template with a clean, modern UI and minim
 - **Fast**: Minimal dependencies for quick loading times
 - **Simple**: Easy to understand and modify
 
+## RBAC & Permissions Matrix
+
+This app uses a centralized, config-driven role/permissions system:
+
+- The permissions matrix file is at `src/config/permissions.js`.
+- All feature/route/conditional rendering uses this shared matrix for flexibility, organization-wide consistency, and ease of updates.
+- Role and permission checks in the UI, hooks, and routes refer to this matrix via the `can()` method on the AuthContext.
+- To visualize the full permissions model, use the included `<PermissionsMatrix />` UI component (`src/components/UI/PermissionsMatrix.js`)—rendered in the Super Admin dashboard by default.
+
+**To add or modify roles and permissions:**  Edit only `src/config/permissions.js`. Your changes propagate app-wide.
+
 ## Getting Started
 
 In the project directory, you can run:
@@ -80,3 +91,4 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+

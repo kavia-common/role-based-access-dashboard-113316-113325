@@ -1,112 +1,60 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "../config/supabase";
+import { hasPermission } from "../config/permissions";
 
 /**
- * AuthContext provides user, org, role, and permission checks for RBAC flows.
- * { user, orgs, currentOrg, roles, hasPermission, loading }
+ * AuthContext provides user, role(s), and RBAC permission helpers.
+ * Context value: { user, role, can(permission), loading }
  */
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [orgs, setOrgs] = useState([]); // All orgs user is part of
-  const [currentOrg, setCurrentOrg] = useState(null); // Org selected
-  const [roles, setRoles] = useState([]); // Role(s) (org, global)
-  const [profile, setProfile] = useState(null); // legacy single profile
+  const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user and RBAC context on auth state
+  // Load user and role from Supabase (profiles table)
   useEffect(() => {
     setLoading(true);
+
     async function loadSession() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       setUser(authUser);
       if (!authUser) {
-        setProfile(null);
-        setOrgs([]);
-        setRoles([]);
-        setCurrentOrg(null);
+        setRole(null);
         setLoading(false);
         return;
       }
-      // Grab all orgs/roles for user from org_users or similar
-      let { data: orgUsers, error } = await supabase
-        .from("organization_users")
-        .select("org_id, organization(name), profiles(role)")
-        .eq("user_id", authUser.id);
-
-      // fallback to single legacy 'profiles'
-      let { data: profileRow } = await supabase
-        .from("profiles").select("*").eq("id", authUser.id).single();
-
-      setProfile(profileRow || null);
-
-      const orgList = orgUsers?.map(o => ({
-        org_id: o.org_id,
-        name: o.organization?.name,
-        role: o.profiles?.role || null
-      })) || [];
-      setOrgs(orgList);
-
-      // Pick currentOrg (could default to first)
-      setCurrentOrg((c) => c || orgList[0] || null);
-      setRoles(orgList.map(o => o.role));
-
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", authUser.id)
+        .single();
+      setRole(data?.role || null);
       setLoading(false);
     }
     loadSession();
-    // Listen to auth state changes:
-    const unsub = supabase.auth.onAuthStateChange((_event, sess) => {
-      if (sess?.user) setUser(sess.user);
-      else setUser(null);
-      setLoading(true);
-      // trigger reload of orgs/roles
-      setTimeout(() => {
-        // lengthen for db propagation
-        window.location.reload();
-      }, 1250);
+
+    // Listen to auth state changes
+    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+      setTimeout(() => { loadSession(); }, 100); // reload after minor delay
     });
+
     return () => {
-      unsub?.data?.unsubscribe?.();
+      listener?.unsubscribe?.();
     };
   }, []);
 
-  // PUBLIC_INTERFACE
-  // RBAC/MATRIX permission check function
-  function hasPermission(permission) {
-    if (!roles || roles.length === 0) return false;
-    // Example permission structure:
-    const matrix = {
-      "super_admin": ["view_super_dashboard", "invite_admin", "all"],
-      "org_admin": ["view_org_dashboard", "invite_user", "all_org"],
-      "invite_admin": ["view_invite_dashboard", "remove_invite"],
-      "user": ["view_user_dashboard", "edit_own_profile"],
-      "guest": [],
-    };
-    for (const r of roles) {
-      if ((matrix[r] || []).includes(permission) || (matrix[r] || []).includes("all") || permission === "all") {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // Allow consumers to change org context...
-  function setActiveOrg(org) {
-    setCurrentOrg(org);
-  }
+  // PUBLIC_INTERFACE: can(permission)
+  const can = (permission) => hasPermission(role, permission);
 
   return (
-    <AuthContext.Provider value={{
-      user, orgs, currentOrg, roles, setActiveOrg,
-      profile, hasPermission, loading
-    }}>
+    <AuthContext.Provider value={{ user, role, can, loading }}>
       {children}
     </AuthContext.Provider>
   );
 }
-
-export default AuthContext;
 
 // PUBLIC_INTERFACE
 export function useAuth() {
