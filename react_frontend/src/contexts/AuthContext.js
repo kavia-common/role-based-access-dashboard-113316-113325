@@ -1,46 +1,89 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
 
+// --- Permissions Matrix Setup --- //
+export const PERMISSIONS_MATRIX = {
+  super_admin: {
+    can: ['manage_orgs', 'manage_users', 'view_all', 'invite_anyone'],
+    description: 'Global super admin. Can manage all organizations and users.',
+    orgScope: false,
+  },
+  org_admin: {
+    can: ['manage_org_users', 'view_org_dashboard', 'invite_org_users'],
+    description: 'Admin of a specific org. Can manage users within their org.',
+    orgScope: true,
+  },
+  org_user: {
+    can: ['view_org_dashboard'],
+    description: 'User within the organization. Can view and interact with org dashboards.',
+    orgScope: true,
+  },
+  guest: {
+    can: [],
+    description: 'Limited access, typically just authenticated.',
+    orgScope: false,
+  },
+};
+
+// ---- AuthContext Setup ---- //
 const AuthContext = createContext({});
 
 // PUBLIC_INTERFACE
 /**
- * Hook to access the authentication context
- * @returns {Object} Authentication context value
- */
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-// PUBLIC_INTERFACE
-/**
- * AuthProvider component that wraps the app and provides authentication context
- * @param {Object} props - Component props
- * @param {React.ReactNode} props.children - Child components
+ * AuthProvider component for the application, supporting multi-org and advanced RBAC.
+ *  - Provides authenticated user, session, org context, and role/permissions helpers.
  */
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [orgMemberships, setOrgMemberships] = useState([]); // List of orgs user belongs to
+  const [currentOrg, setCurrentOrg] = useState(null); // Currently active org (object: {id, name, ...})
+  const [roleInOrg, setRoleInOrg] = useState(null); // Role of user in active org
+  const [globalRole, setGlobalRole] = useState(null); // super_admin, etc.
   const [userProfile, setUserProfile] = useState(null);
 
-  // Get user profile data including role from the profiles table
+  // Helper to fetch org memberships (for org_users with roles, org info)
+  const getOrgMemberships = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('org_users')
+        .select('org_id, orgs (name), role')
+        .eq('user_id', userId);
+      if (error) throw error;
+      // Returns: [{ org_id, orgs: { name }, role }]
+      return data;
+    } catch (error) {
+      console.error('Error fetching org memberships:', error);
+      return [];
+    }
+  };
+
+  // Helper to get top-level/global role from profiles table
+  const getGlobalRole = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, global_role')
+        .eq('id', userId)
+        .single();
+      if (error) throw error;
+      return data?.global_role || null;
+    } catch (error) {
+      console.error('Error fetching global role:', error);
+      return null;
+    }
+  };
+
+  // Helper to fetch user profile details (audit convenience + future custom info)
   const getUserProfile = async (userId) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, role, created_at, updated_at')
+        .select('*')
         .eq('id', userId)
         .single();
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return null;
-      }
+      if (error) throw error;
       return data;
     } catch (error) {
       console.error('Error in getUserProfile:', error);
@@ -48,54 +91,83 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Initialize auth state on mount
+  // Set currentOrg and roleInOrg when memberships or selection changes
+  useEffect(() => {
+    if (currentOrg && orgMemberships.length > 0) {
+      const found = orgMemberships.find((m) => m.org_id === currentOrg.id);
+      setRoleInOrg(found?.role || null);
+    } else {
+      setRoleInOrg(null);
+    }
+  }, [currentOrg, orgMemberships]);
+
+  // Load session and profile/org/role data
   useEffect(() => {
     let mounted = true;
-
-    // Get initial session
-    const getInitialSession = async () => {
+    const load = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        
-        if (mounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          
-          if (session?.user) {
-            const profile = await getUserProfile(session.user.id);
-            setUserProfile(profile);
-          } else {
-            setUserProfile(null);
+        if (!mounted) return;
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          // --- Load user profile and org memberships --- //
+          const userId = session.user.id;
+          const [profile, orgs, gRole] = await Promise.all([
+            getUserProfile(userId),
+            getOrgMemberships(userId),
+            getGlobalRole(userId),
+          ]);
+          setUserProfile(profile);
+          setOrgMemberships(orgs || []);
+          setGlobalRole(gRole);
+
+          // If orgs found and no active selection, select the first by default
+          if ((orgs || []).length > 0 && !currentOrg) {
+            setCurrentOrg({ id: orgs[0].org_id, name: orgs[0].orgs?.name });
           }
-          
-          setLoading(false);
+        } else {
+          setUserProfile(null);
+          setOrgMemberships([]);
+          setGlobalRole(null);
+          setCurrentOrg(null);
         }
+        setLoading(false);
       } catch (error) {
-        console.error('Error getting initial session:', error);
-        if (mounted) {
-          setLoading(false);
-        }
+        console.error('Error in AuthProvider load:', error);
+        if (mounted) setLoading(false);
       }
     };
 
-    getInitialSession();
+    load();
 
-    // Listen for auth changes
+    // Subscribe to Supabase auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (mounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          
-          if (session?.user) {
-            const profile = await getUserProfile(session.user.id);
-            setUserProfile(profile);
-          } else {
-            setUserProfile(null);
+        if (!mounted) return;
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          const userId = session.user.id;
+          const [profile, orgs, gRole] = await Promise.all([
+            getUserProfile(userId),
+            getOrgMemberships(userId),
+            getGlobalRole(userId),
+          ]);
+          setUserProfile(profile);
+          setOrgMemberships(orgs || []);
+          setGlobalRole(gRole);
+          if ((orgs || []).length > 0 && !currentOrg) {
+            setCurrentOrg({ id: orgs[0].org_id, name: orgs[0].orgs?.name });
           }
-          
-          setLoading(false);
+        } else {
+          setUserProfile(null);
+          setOrgMemberships([]);
+          setGlobalRole(null);
+          setCurrentOrg(null);
         }
+        setLoading(false);
       }
     );
 
@@ -103,16 +175,58 @@ export const AuthProvider = ({ children }) => {
       mounted = false;
       subscription?.unsubscribe();
     };
+    // eslint-disable-next-line
   }, []);
 
+  // PUBLIC_INTERFACE: Set org context (used if user has >1 org)
+  const selectOrg = (orgId) => {
+    const org = orgMemberships.find((m) => m.org_id === orgId);
+    if (org) {
+      setCurrentOrg({ id: org.org_id, name: org.orgs?.name });
+      setRoleInOrg(org.role);
+    }
+  };
+
+  // PUBLIC_INTERFACE: Does user have a global/super_admin role
+  const isSuperAdmin = () => globalRole === 'super_admin';
+
+  // PUBLIC_INTERFACE: Does user have a role in the active org
+  const hasOrgRole = (role) => roleInOrg === role;
+
+  // PUBLIC_INTERFACE: Get current effective role (super_admin overrides org_role)
+  const getEffectiveRole = () => {
+    if (isSuperAdmin()) return 'super_admin';
+    return roleInOrg || globalRole || null;
+  };
+
+  // PUBLIC_INTERFACE: Check permission by action (using permissions matrix)
+  const hasPermission = (permission) => {
+    const role = getEffectiveRole();
+    if (!role) return false;
+    const perms = PERMISSIONS_MATRIX[role]?.can || [];
+    return perms.includes(permission);
+  };
+
+  // PUBLIC_INTERFACE: Shortcut for checking if authenticated
+  const isAuthenticated = () => !!user && !!session;
+
+  // PUBLIC_INTERFACE: Get list of orgs this user belongs to
+  const getOrgs = () => orgMemberships.map((m) => ({
+    id: m.org_id,
+    name: m.orgs?.name,
+    role: m.role,
+  }));
+
+  // PUBLIC_INTERFACE: Get current org and org role
+  const getCurrentOrg = () => currentOrg;
+  const getOrgRole = () => roleInOrg;
+
+  // PUBLIC_INTERFACE: Core Supabase session info
+  const getUser = () => user;
+  const getSession = () => session;
+
+  // --- Core Auth operations (signUp, signIn, signOut, etc.) --- //
   // PUBLIC_INTERFACE
-  /**
-   * Sign up a new user with email and password
-   * @param {string} email - User email
-   * @param {string} password - User password
-   * @param {Object} options - Additional signup options
-   * @returns {Promise} Promise that resolves to signup result
-   */
   const signUp = async (email, password, options = {}) => {
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -120,17 +234,11 @@ export const AuthProvider = ({ children }) => {
         password,
         options: {
           emailRedirectTo: `${process.env.REACT_APP_SITE_URL || window.location.origin}/auth/callback`,
-          ...options
-        }
+          ...options,
+        },
       });
-
       if (error) throw error;
-
-      // If user is created and confirmed, create profile with default role
-      if (data.user && data.user.email_confirmed_at) {
-        await createUserProfile(data.user.id, 'user');
-      }
-
+      // No profile/org auto-creation, expect backend trigger/Edge function to handle invitations and membership.
       return { data, error: null };
     } catch (error) {
       console.error('Error in signUp:', error);
@@ -139,19 +247,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   // PUBLIC_INTERFACE
-  /**
-   * Sign in a user with email and password
-   * @param {string} email - User email
-   * @param {string} password - User password
-   * @returns {Promise} Promise that resolves to signin result
-   */
   const signIn = async (email, password) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
       });
-
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
@@ -161,19 +262,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   // PUBLIC_INTERFACE
-  /**
-   * Sign out the current user
-   * @returns {Promise} Promise that resolves to signout result
-   */
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
       setUser(null);
       setSession(null);
+      setOrgMemberships([]);
       setUserProfile(null);
-      
+      setCurrentOrg(null);
+      setRoleInOrg(null);
+      setGlobalRole(null);
       return { error: null };
     } catch (error) {
       console.error('Error in signOut:', error);
@@ -181,117 +280,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Create user profile in profiles table
-  const createUserProfile = async (userId, role = 'user') => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: userId,
-            role: role,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating user profile:', error);
-        return null;
-      }
-      
-      setUserProfile(data);
-      return data;
-    } catch (error) {
-      console.error('Error in createUserProfile:', error);
-      return null;
-    }
-  };
-
-  // PUBLIC_INTERFACE
-  /**
-   * Update user profile role (admin only)
-   * @param {string} userId - User ID to update
-   * @param {string} role - New role to assign
-   * @returns {Promise} Promise that resolves to update result
-   */
-  const updateUserRole = async (userId, role) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ 
-          role: role,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      // If updating current user's role, update local state
-      if (userId === user?.id) {
-        setUserProfile(data);
-      }
-      
-      return { data, error: null };
-    } catch (error) {
-      console.error('Error updating user role:', error);
-      return { data: null, error };
-    }
-  };
-
-  // PUBLIC_INTERFACE
-  /**
-   * Get user role from profile
-   * @returns {string|null} User role or null if not available
-   */
-  const getUserRole = () => {
-    return userProfile?.role || null;
-  };
-
-  // PUBLIC_INTERFACE
-  /**
-   * Check if user has specific role
-   * @param {string} role - Role to check
-   * @returns {boolean} True if user has the role
-   */
-  const hasRole = (role) => {
-    return getUserRole() === role;
-  };
-
-  // PUBLIC_INTERFACE
-  /**
-   * Check if user is admin
-   * @returns {boolean} True if user is admin
-   */
-  const isAdmin = () => {
-    return hasRole('admin');
-  };
-
-  // PUBLIC_INTERFACE
-  /**
-   * Check if user is authenticated
-   * @returns {boolean} True if user is authenticated
-   */
-  const isAuthenticated = () => {
-    return !!user && !!session;
-  };
-
-  // PUBLIC_INTERFACE
-  /**
-   * Reset password for user
-   * @param {string} email - User email
-   * @returns {Promise} Promise that resolves to reset result
-   */
+  // PUBLIC_INTERFACE: Reset password
   const resetPassword = async (email) => {
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.REACT_APP_SITE_URL || window.location.origin}/auth/reset-password`
+        redirectTo: `${process.env.REACT_APP_SITE_URL || window.location.origin}/auth/reset-password`,
       });
-
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
@@ -300,20 +294,36 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // --- Context value exposed to consumers --- //
   const value = {
     user,
     session,
     userProfile,
     loading,
+    orgMemberships,
+    currentOrg,
+    roleInOrg,
+    globalRole,
+
+    // Core auth
     signUp,
     signIn,
     signOut,
-    updateUserRole,
-    getUserRole,
-    hasRole,
-    isAdmin,
+    resetPassword,
+
+    // Role/org helpers
+    selectOrg,
+    isSuperAdmin,
+    hasOrgRole,
+    getEffectiveRole,
+    hasPermission,
     isAuthenticated,
-    resetPassword
+    getOrgs,
+    getCurrentOrg,
+    getOrgRole,
+    getUser,
+    getSession,
+    PERMISSIONS_MATRIX,
   };
 
   return (
@@ -321,6 +331,16 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
+};
+
+/**
+ * PUBLIC_INTERFACE
+ * useAuth() - React hook for accessing AuthContext in any component or custom hook.
+ */
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
 };
 
 export default AuthContext;
