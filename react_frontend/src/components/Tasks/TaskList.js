@@ -1,13 +1,34 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import PropTypes from 'prop-types';
+import useTasks from '../../hooks/useTasks';
 
 /**
- * TaskList component displays a list of user tasks for the day.
+ * TaskList component displays a list of user tasks for the day, with per-task progress status dropdown.
  * @param {Object[]} tasks - Array of task objects.
+ * @param {string|number} userId - User ID (for useTasks hook, if needed).
  */
- // PUBLIC_INTERFACE
-function TaskList({ tasks }) {
-  /** This is a public component for displaying a user's daily task list. */
+// PUBLIC_INTERFACE
+function TaskList({ tasks, userId }) {
+  /** This is a public component for displaying and updating a user's daily task list. */
+
+  // useTasks provides updateTask to modify a task's progress in real-time
+  const { updateTask } = useTasks(userId);
+
+  // Mapping between status string and numeric progress value
+  const statusOptions = [
+    { value: 0, label: "Not started" },
+    { value: 50, label: "In progress" },
+    { value: 100, label: "Done" }
+  ];
+
+  // Handler for dropdown change
+  const handleStatusChange = useCallback(
+    (taskId, progress) => {
+      // Update progress for the task, Supabase reflects in real-time via useTasks hook
+      updateTask(taskId, { progress });
+    },
+    [updateTask]
+  );
 
   if (!tasks) {
     return <div>Loading tasks...</div>;
@@ -38,9 +59,9 @@ function TaskList({ tasks }) {
           }}>
             <span style={{
               flex: 1,
-              textDecoration: task.completed ? "line-through" : "none",
-              color: task.completed ? "#64748b" : "#111",
-              opacity: task.completed ? 0.6 : 1
+              textDecoration: Number(task.progress) === 100 ? "line-through" : "none",
+              color: Number(task.progress) === 100 ? "#64748b" : "#111",
+              opacity: Number(task.progress) === 100 ? 0.6 : 1
             }}>
               {task.title}
             </span>
@@ -53,6 +74,24 @@ function TaskList({ tasks }) {
                 {new Date(task.due_date).toLocaleDateString()}
               </span>
             )}
+            <select
+              aria-label="Update task status"
+              style={{
+                marginLeft: "1.25rem",
+                padding: "0.25rem 0.5rem",
+                fontSize: "0.95rem",
+                border: "1px solid #eb8e24",
+                borderRadius: "6px",
+                background: "#fff7ea",
+                color: "#eb8e24"
+              }}
+              value={Number(task.progress) || 0}
+              onChange={e => handleStatusChange(task.id, Number(e.target.value))}
+            >
+              {statusOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </li>
         ))}
       </ul>
@@ -67,8 +106,10 @@ TaskList.propTypes = {
       title: PropTypes.string.isRequired,
       completed: PropTypes.bool,
       due_date: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.instanceOf(Date)]),
+      progress: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
     }),
   ),
+  userId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
 };
 
 export default TaskList;
