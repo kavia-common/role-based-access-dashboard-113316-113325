@@ -1,97 +1,151 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { supabase } from "../../config/supabase";
-import RoleBadge from "../Roles/RoleBadge";
-import Dialog from "../UI/Dialog";
+import { ToastContext } from "../UI/ToastContext";
 import EmptyState from "../UI/EmptyState";
 import Skeleton from "../UI/Skeleton";
-import { useToast } from "../UI/ToastContext";
+import Dialog from "../UI/Dialog";
+import RoleBadge from "../Roles/RoleBadge";
 
-/**
- * PUBLIC_INTERFACE
- * Organization Admin dashboard displaying user management for their org.
- */
-export default function OrgAdminDashboard({ orgId }) {
-  const [users, setUsers] = useState(null);
+// Helper to call invite_user Edge Function (duplicated for isolation; could be moved to shared/utils)
+async function inviteUser({ email, role, orgId }, setToast) {
+  try {
+    const response = await fetch('/functions/v1/invite_user', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email, role, org_id: orgId })
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      setToast({
+        type: "error",
+        message: data?.error || "Invitation failed. Please try again."
+      });
+      return false;
+    }
+
+    setToast({
+      type: "success",
+      message: data?.message || "User invited successfully."
+    });
+    return true;
+  } catch (err) {
+    setToast({
+      type: "error",
+      message: "Network error. Please try again."
+    });
+    return false;
+  }
+}
+
+function OrgAdminDashboard() {
+  const { addToast } = useContext(ToastContext);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [inviteDialog, setInviteDialog] = useState(false);
+  // Org context should come from current user's org
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const { addToast } = useToast();
+  const [inviteRole, setInviteRole] = useState("user");
+  const [submittingInvite, setSubmittingInvite] = useState(false);
 
-  // Fetch users for orgId
+  // demo: assume org_id is 1, in practice, fetch from user/profile context
+  const orgId = 1;
   useEffect(() => {
-    setLoading(true);
-    async function fetchOrgUsers() {
-      if (!orgId) return;
-      const { data, error } = await supabase
-        .from("organization_users")
-        .select("user_id, profiles(email, role)")
+    async function fetchUsers() {
+      setLoading(true);
+      let { data, error } = await supabase
+        .from("profiles")
+        .select("id, email, role, org_id")
         .eq("org_id", orgId);
-      if (error) addToast("Error loading org users", "error");
-      setUsers(data || []);
+      if (!error && data) setUsers(data);
       setLoading(false);
     }
-    fetchOrgUsers();
-  }, [orgId, addToast]);
+    fetchUsers();
+  }, [orgId]);
 
-  // Invite regular user to org
-  async function handleInviteSubmit(e) {
+  const handleInvite = async (e) => {
     e.preventDefault();
-    if (!inviteEmail) return;
-    const { error } = await supabase.from("invites")
-      .insert([{ email: inviteEmail, org_id: orgId, role: "user" }]);
-    if (error) addToast("Error sending invite", "error");
-    else {
-      addToast("Invite sent!", "success");
-      setInviteDialog(false);
-      setInviteEmail("");
-    }
-  }
-
-  if (loading) return (
-    <div><Skeleton width={300} height={30} /><Skeleton width={500} height={62} /></div>
-  );
+    setSubmittingInvite(true);
+    await inviteUser(
+      { email: inviteEmail.trim(), role: inviteRole, orgId: orgId },
+      addToast
+    );
+    setSubmittingInvite(false);
+    setInviteDialogOpen(false);
+    setInviteEmail("");
+    setInviteRole("user");
+  };
 
   return (
     <div>
-      <h2 style={{ color: "#64748b" }}>Organization Admin Dashboard</h2>
-      <div>
-        {users && users.length === 0 && <EmptyState message="No users in this organization." />}
-        {users && users.map(({ user_id, profiles: user }) => (
-          <div key={user_id} style={{
-            borderBottom: "1px solid #eee", margin: "8px 0", padding: "4px 0",
-            display: "flex", alignItems: "center", gap: 16
-          }}>
-            <span>{user.email}</span> <RoleBadge role={user.role} />
-          </div>
-        ))}
-      </div>
-      <button style={{
-        background: "#fbbf24", color: "#fff", border: "none", borderRadius: 5,
-        padding: "8px 14px", margin: "12px 0"
-      }}
-        onClick={() => setInviteDialog(true)}
-      >
+      <h2>Org Admin Dashboard</h2>
+      <button onClick={() => setInviteDialogOpen(true)} className="btn-primary">
         Invite User
       </button>
-      <Dialog open={inviteDialog} onClose={() => setInviteDialog(false)}>
-        <h3>Invite New User</h3>
-        <form onSubmit={handleInviteSubmit}>
-          <input
-            type="email"
-            placeholder="Enter user email"
-            value={inviteEmail}
-            onChange={e => setInviteEmail(e.target.value)}
-            required
-            style={{ width: "90%", padding: 8, margin: "10px 0", border: "1px solid #ddd", borderRadius: 5 }}
-          />
-          <br />
-          <button type="submit" style={{
-            background: "#22c55e", color: "#fff", border: "none", borderRadius: 6, padding: "6px 16px", fontWeight: 600
-          }}>
-            Send Invite
+      <Dialog
+        open={inviteDialogOpen}
+        onClose={() => setInviteDialogOpen(false)}
+        title="Invite User"
+      >
+        <form onSubmit={handleInvite} style={{ minWidth: 260 }}>
+          <label>
+            Email:
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={e => setInviteEmail(e.target.value)}
+              required
+              autoFocus
+            />
+          </label>
+          <label>
+            Role:
+            <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+              <option value="admin">Admin</option>
+              <option value="user">User</option>
+              <option value="guest">Guest</option>
+            </select>
+          </label>
+          <button
+            type="submit"
+            className="btn-primary"
+            style={{ marginTop: 16 }}
+            disabled={submittingInvite}
+          >
+            {submittingInvite ? "Sending..." : "Send Invite"}
           </button>
         </form>
       </Dialog>
+      {loading ? (
+        <Skeleton />
+      ) : users.length === 0 ? (
+        <EmptyState message="No users in your org." />
+      ) : (
+        <table className="user-list">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Org</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <tr key={u.id}>
+                <td>{u.email}</td>
+                <td>{u.org_id}</td>
+                <td>
+                  <RoleBadge role={u.role} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
+
+export default OrgAdminDashboard;
