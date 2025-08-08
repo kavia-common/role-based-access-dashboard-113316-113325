@@ -1,114 +1,101 @@
-import React, { useCallback } from 'react';
-import PropTypes from 'prop-types';
-import useTasks from '../../hooks/useTasks';
+import React from "react";
 
 /**
- * TaskList component displays a list of user tasks for the day, with per-task progress status dropdown.
- * @param {Object[]} tasks - Array of task objects.
- * @param {string|number} userId - User ID (for useTasks hook, if needed).
+ * PUBLIC_INTERFACE
+ * TaskList displays today's tasks with minimal, separated style.
  */
-// PUBLIC_INTERFACE
-function TaskList({ tasks, userId }) {
-  /** This is a public component for displaying and updating a user's daily task list. */
-  // Security: Always ensure the hook is tied to the current userId
-  const { updateTask } = useTasks(userId);
-
-  // Mapping between status string and numeric progress value
-  const statusOptions = [
-    { value: 0, label: "Not started" },
-    { value: 50, label: "In progress" },
-    { value: 100, label: "Done" }
-  ];
-
-  // Handler for dropdown change
-  const handleStatusChange = useCallback(
-    (taskId, progress) => {
-      // Update progress for the task, Supabase reflects in real-time via useTasks hook
-      updateTask(taskId, { progress });
-    },
-    [updateTask]
-  );
-
-  if (!tasks) {
-    return <div>Loading tasks...</div>;
-  }
-
-  if (tasks.length === 0) {
-    return <div className="task-list-empty">No tasks for today 🎉</div>;
+function TaskList({ tasks, onToggleComplete, onDeleteTask }) {
+  if (!tasks || tasks.length === 0) {
+    return (
+      <div
+        className="empty-tasks"
+        style={{
+          color: "#64748b",
+          opacity: 0.6,
+          textAlign: "center",
+          margin: "2.5rem 0",
+          fontSize: "1.08rem",
+        }}
+      >
+        No tasks for today. 🎉
+      </div>
+    );
   }
 
   return (
-    <div className="task-list-container">
-      <h2 style={{marginBottom: "0.75rem"}}>Today's Tasks</h2>
-      <ul className="task-list" style={{
-        background: "#fff",
+    <ul
+      className="task-list"
+      style={{
         padding: 0,
-        borderRadius: "8px",
-        boxShadow: "0 2px 8px #fbbf2440",
-        listStyle: 'none',
         margin: 0,
-      }}>
-        {tasks.map((task) => (
-          <li key={task.id} className="task-list-item" style={{
-            padding: "0.75rem 1rem",
-            borderBottom: "1px solid #f3f4f6",
+        listStyle: "none",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.6rem",
+      }}
+    >
+      {tasks.map((task) => (
+        <li
+          key={task.id}
+          className={task.completed ? "completed" : ""}
+          style={{
             display: "flex",
             alignItems: "center",
-            fontSize: "1rem"
-          }}>
-            <span style={{
-              flex: 1,
-              textDecoration: Number(task.progress) === 100 ? "line-through" : "none",
-              color: Number(task.progress) === 100 ? "#64748b" : "#111",
-              opacity: Number(task.progress) === 100 ? 0.6 : 1
-            }}>
-              {task.title}
-            </span>
-            {task.due_date && (
-              <span style={{
-                fontSize: "0.825rem",
-                color: "#eb8e24",
-                marginLeft: "1.25rem"
-              }}>
-                {new Date(task.due_date).toLocaleDateString()}
-              </span>
-            )}
-            <select
-              aria-label="Update task status"
+            gap: "1rem",
+            background: "#fff",
+            padding: "0.98rem 1.2rem",
+            borderRadius: "10px",
+            border: task.completed
+              ? "1.5px solid #fbbf24"
+              : "1px solid #f3f4f6",
+            boxShadow: "0 2px 6px rgba(100,116,139,0.05)",
+            textDecoration: task.completed ? "line-through" : "none",
+            opacity: task.completed ? 0.72 : 1,
+            fontWeight: 500,
+            fontSize: "1.03rem",
+            color: task.completed ? "#cacaca" : "#22223b",
+            justifyContent: "space-between",
+            transition: "border 0.2s, box-shadow 0.2s",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", flex: 1 }}>
+            <input
+              type="checkbox"
+              checked={!!task.completed}
+              onChange={() => onToggleComplete(task.id)}
+              aria-label={`Mark task "${task.title}" as ${
+                task.completed ? "incomplete" : "complete"
+              }`}
               style={{
-                marginLeft: "1.25rem",
-                padding: "0.25rem 0.5rem",
-                fontSize: "0.95rem",
-                border: "1px solid #eb8e24",
-                borderRadius: "6px",
-                background: "#fff7ea",
-                color: "#eb8e24"
+                accentColor: "#eb8e24",
+                width: 18,
+                height: 18,
               }}
-              value={Number(task.progress) || 0}
-              onChange={e => handleStatusChange(task.id, Number(e.target.value))}
-            >
-              {statusOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </li>
-        ))}
-      </ul>
-    </div>
+            />
+            <span>{task.title}</span>
+          </div>
+          <button
+            onClick={() => onDeleteTask(task.id)}
+            style={{
+              background: "#fff",
+              color: "#eb8e24",
+              border: "1.3px solid #fbbf24",
+              borderRadius: "6px",
+              padding: "0.2rem 0.85rem",
+              fontWeight: 500,
+              fontSize: "0.99rem",
+              marginLeft: "1rem",
+              cursor: "pointer",
+              transition: "background 0.13s, color 0.13s",
+            }}
+            aria-label={`Delete task "${task.title}"`}
+          >
+            Delete
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
-
-TaskList.propTypes = {
-  tasks: PropTypes.arrayOf(
-    PropTypes.shape({
-      id:    PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-      title: PropTypes.string.isRequired,
-      completed: PropTypes.bool,
-      due_date: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.instanceOf(Date)]),
-      progress: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
-    }),
-  ),
-  userId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
-};
 
 export default TaskList;

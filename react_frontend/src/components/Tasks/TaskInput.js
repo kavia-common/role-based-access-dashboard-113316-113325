@@ -1,133 +1,70 @@
 import React, { useState } from "react";
-import PropTypes from "prop-types";
 
 /**
- * TaskInput modal/component for adding new tasks.
- * Allows user to input title, description, and select initial status.
- * Integrates with useTasks hook for Supabase insert.
- * 
- * Props:
- *  - onTaskCreated: function(task) called upon successful addition (optional)
- *  - onClose: function() to close modal/input (optional)
+ * PUBLIC_INTERFACE
+ * Input component for adding a new daily task, styled for clarity and clean UX.
  */
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "done", label: "Done" }
-];
+function TaskInput({ onAddTask }) {
+  const [task, setTask] = useState("");
 
-export default function TaskInput({ createTask, user, onTaskCreated, onClose }) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState(STATUS_OPTIONS[0].value);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  // PUBLIC_INTERFACE
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!title.trim()) {
-      setError("Title is required.");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const newTask = {
-        title,
-        description,
-        progress: status,
-        user_id: user?.id,
-        date: new Date().toISOString()
-      };
-      const result = await createTask(newTask);
-      if (result?.error) {
-        setError(result.error.message || "Unable to create task.");
-      } else {
-        setTitle("");
-        setDescription("");
-        setStatus(STATUS_OPTIONS[0].value);
-        if (onTaskCreated) onTaskCreated(result.data);
-        if (onClose) onClose();
-      }
-    } catch (err) {
-      setError(err.message || "Error adding task.");
-    } finally {
-      setLoading(false);
+    if (task.trim()) {
+      onAddTask(task.trim());
+      setTask("");
     }
   };
 
   return (
-    <div className="task-input-modal">
-      <form className="task-input-form" onSubmit={handleSubmit} style={{
-        padding: 24,
-        border: "1px solid #eee",
-        borderRadius: 8,
+    <form
+      className="task-input-form"
+      onSubmit={handleSubmit}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "0.6rem",
+        marginBottom: "1.4rem",
         background: "#fff",
-        maxWidth: 400,
-        margin: "0 auto",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.07)"
-      }}>
-        <h3 style={{marginBottom:12}}>Add New Task</h3>
-        <div style={{marginBottom:12}}>
-          <label style={{fontWeight:500}}>Title</label>
-          <input
-            style={{width:"100%",padding:8,marginTop:4,border:"1px solid #ccc",borderRadius:4}}
-            type="text"
-            value={title}
-            onChange={e=>setTitle(e.target.value)}
-            disabled={loading}
-            required
-          />
-        </div>
-        <div style={{marginBottom:12}}>
-          <label style={{fontWeight:500}}>Description</label>
-          <textarea
-            style={{width:"100%",padding:8,marginTop:4,border:"1px solid #ccc",borderRadius:4,minHeight:60}}
-            value={description}
-            onChange={e=>setDescription(e.target.value)}
-            disabled={loading}
-          />
-        </div>
-        <div style={{marginBottom:18}}>
-          <label style={{fontWeight:500}}>Status</label>
-          <select
-            style={{width:"100%",padding:8,marginTop:4,border:"1px solid #ccc",borderRadius:4}}
-            value={status}
-            onChange={e=>setStatus(e.target.value)}
-            disabled={loading}
-          >
-            {STATUS_OPTIONS.map(opt => (
-              <option value={opt.value} key={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-        {error && <div style={{ color: "#dc2626", marginBottom: 8 }}>{error}</div>}
-        <div style={{display:"flex",gap:10}}>
-          <button type="submit"
-            style={{
-              background:"#eb8e24", color:"white", border:"none", borderRadius:4, padding:"8px 18px", fontWeight:500, cursor:"pointer"
-            }}
-            disabled={loading}
-          >{loading ? "Adding..." : "Add Task"}</button>
-          {onClose && (
-            <button type="button"
-              style={{
-                background:"#64748b", color:"white", border:"none", borderRadius:4, padding:"8px 18px", fontWeight:500, cursor:"pointer"
-              }}
-              onClick={onClose}
-              disabled={loading}
-            >Cancel</button>
-          )}
-        </div>
-      </form>
-    </div>
+        padding: "1.1rem 1.4rem",
+        borderRadius: "10px",
+        boxShadow: "0 2px 6px rgba(235,142,36,0.06)",
+        border: "1px solid #f3f4f6",
+      }}
+    >
+      <input
+        type="text"
+        value={task}
+        onChange={(e) => setTask(e.target.value)}
+        placeholder="Add daily task..."
+        maxLength={100}
+        style={{
+          flex: 1,
+          fontSize: "1rem",
+          border: "none",
+          outline: "none",
+          background: "transparent",
+        }}
+        aria-label="Enter a new daily task"
+      />
+      <button
+        type="submit"
+        style={{
+          background: "#fbbf24",
+          border: "none",
+          borderRadius: "7px",
+          color: "#fff",
+          fontWeight: 600,
+          fontSize: "1rem",
+          padding: "0.5rem 1.3rem",
+          cursor: "pointer",
+          transition: "background 0.17s",
+          boxShadow: "0 1px 8px 0 rgba(251,191,36,0.03)",
+        }}
+      >
+        Add
+      </button>
+    </form>
   );
 }
 
-TaskInput.propTypes = {
-  createTask: PropTypes.func.isRequired,
-  user: PropTypes.object,
-  onTaskCreated: PropTypes.func,
-  onClose: PropTypes.func
-};
+export default TaskInput;
