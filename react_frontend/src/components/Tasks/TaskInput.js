@@ -16,14 +16,12 @@ const STATUS_OPTIONS = [
   { value: "done", label: "Done" }
 ];
 
-export default function TaskInput({ useTasks, user, onTaskCreated, onClose }) {
+export default function TaskInput({ createTask, user, onTaskCreated, onClose }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState(STATUS_OPTIONS[0].value);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
-  const { createTask } = useTasks();
 
   // PUBLIC_INTERFACE
   const handleSubmit = async (e) => {
@@ -128,7 +126,7 @@ export default function TaskInput({ useTasks, user, onTaskCreated, onClose }) {
 }
 
 TaskInput.propTypes = {
-  useTasks: PropTypes.func.isRequired,
+  createTask: PropTypes.func.isRequired,
   user: PropTypes.object,
   onTaskCreated: PropTypes.func,
   onClose: PropTypes.func

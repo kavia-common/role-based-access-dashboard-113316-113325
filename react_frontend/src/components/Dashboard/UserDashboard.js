@@ -20,7 +20,15 @@ const UserDashboard = () => {
   const [showTaskInput, setShowTaskInput] = useState(false);
 
   // Tasks
-  const { tasks = [], loading: tasksLoading, error: tasksError, refetch } = useTasks(user?.id);
+  const {
+    tasks = [],
+    loading: tasksLoading,
+    error: tasksError,
+    getTasks,
+    createTask,
+    updateTask,
+    deleteTask,
+  } = useTasks(user?.id);
 
   // Filter for today's tasks, using string-based date comparison for robustness
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -119,7 +127,7 @@ const UserDashboard = () => {
   // Task Adding
   const handleTaskCreated = () => {
     setShowTaskInput(false);
-    if (typeof refetch === "function") refetch();
+    if (typeof getTasks === "function") getTasks();
   };
 
   return (
@@ -483,7 +491,7 @@ const UserDashboard = () => {
             }}
           >
             <TaskInput
-              useTasks={useTasks}
+              createTask={createTask}
               user={user}
               onTaskCreated={handleTaskCreated}
               onClose={() => setShowTaskInput(false)}
@@ -491,7 +499,7 @@ const UserDashboard = () => {
           </div>
         )}
         <div style={{ marginTop: 18 }}>
-          <TaskList tasks={tasksLoading ? null : dailyTasks} />
+          <TaskList tasks={tasksLoading ? null : dailyTasks} userId={user?.id} />
           {tasksError && <div style={{ color: "red", marginTop: 12 }}>{tasksError.message}</div>}
         </div>
       </div>

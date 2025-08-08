@@ -10,8 +10,7 @@ import useTasks from '../../hooks/useTasks';
 // PUBLIC_INTERFACE
 function TaskList({ tasks, userId }) {
   /** This is a public component for displaying and updating a user's daily task list. */
-
-  // useTasks provides updateTask to modify a task's progress in real-time
+  // Security: Always ensure the hook is tied to the current userId
   const { updateTask } = useTasks(userId);
 
   // Mapping between status string and numeric progress value
