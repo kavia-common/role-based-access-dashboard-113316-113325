@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
+import { buildAbsoluteUrl } from '../config/site';
 
 const AuthContext = createContext({});
 
@@ -119,7 +120,8 @@ export const AuthProvider = ({ children }) => {
         email,
         password,
         options: {
-          emailRedirectTo: `${process.env.REACT_APP_SITE_URL || window.location.origin}/auth/callback`,
+          // Build an absolute URL dynamically from env or current origin to avoid hardcoded localhost
+          emailRedirectTo: buildAbsoluteUrl('/auth/callback'),
           ...options
         }
       });
@@ -289,7 +291,8 @@ export const AuthProvider = ({ children }) => {
   const resetPassword = async (email) => {
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.REACT_APP_SITE_URL || window.location.origin}/auth/reset-password`
+        // Build an absolute URL dynamically from env or current origin to avoid hardcoded localhost
+        redirectTo: buildAbsoluteUrl('/auth/reset-password')
       });
 
       if (error) throw error;
